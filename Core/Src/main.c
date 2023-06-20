@@ -310,13 +310,15 @@ static void task1_handler(void* parameters)
 	while(1)
 	{
     printf("%s\n", (char*)parameters);
+    taskYIELD(); /* Force a context switch */
   }
 }
 static void task2_handler(void* parameters)
 {
 	while(1)
 	{
-    printf("%s\n", (char*)parameters);    
+    printf("%s\n", (char*)parameters);
+    taskYIELD(); /* Force a context switch */    
   }
 }
 /* USER CODE END 4 */
