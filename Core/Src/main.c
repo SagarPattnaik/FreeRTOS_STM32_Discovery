@@ -51,8 +51,9 @@
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 /* USER CODE BEGIN PFP */
-static void task1_handler(void* parameters);
-static void task2_handler(void* parameters);
+static void led_green_handler(void* parameters);
+static void led_orange_handler(void* parameters);
+static void led_red_handler(void* parameters);
 extern  void SEGGER_UART_init(uint32_t);
 /* USER CODE END PFP */
 
@@ -68,9 +69,11 @@ extern  void SEGGER_UART_init(uint32_t);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-	BaseType_t status;
-  TaskHandle_t task1_handle;
+	TaskHandle_t task1_handle;
 	TaskHandle_t task2_handle;
+	TaskHandle_t task3_handle;
+	BaseType_t status;
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -97,13 +100,18 @@ int main(void)
   SEGGER_UART_init(250000);
   SEGGER_SYSVIEW_Conf();
   /* SEGGER_SYSVIEW_Start(); */
-  status = xTaskCreate(task1_handler, "Task-1", 200, "Hello world from Task-1", 2, &task1_handle);
+  status = xTaskCreate(led_green_handler, "LED_green_task", 200, NULL, 2, &task1_handle);
 
-  configASSERT(status == pdPASS); /* Trap to an Infinite Loop here if status Fails */
+  configASSERT(status == pdPASS);
 
-  status = xTaskCreate(task2_handler, "Task-2", 200, "Hello world from Task-2", 2, &task2_handle);
+  status = xTaskCreate(led_red_handler, "LED_red_task", 200,NULL, 2, &task2_handle);
 
-  configASSERT(status == pdPASS); /* Trap to an Infinite Loop here if status Fails */
+  configASSERT(status == pdPASS);
+
+  status = xTaskCreate(led_orange_handler, "LED_orange_task", 200, NULL, 2, &task3_handle);
+
+  configASSERT(status == pdPASS);
+
   //start the freeRTOS scheduler
   vTaskStartScheduler();
   //if the control comes here, then the launch of the scheduler has failed due to
@@ -310,28 +318,43 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-static void task1_handler(void* parameters)
+
+static void led_green_handler(void* parameters)
 {
-	char msg[100];
+
 	while(1)
 	{
-	  /*   printf("%s\n", (char*)parameters); */ /* For SWV */
-		snprintf(msg,100,"%s\n", (char*)parameters);
-		SEGGER_SYSVIEW_PrintfTarget(msg);
-		taskYIELD();
-  }
+		SEGGER_SYSVIEW_PrintfTarget("Toggling green LED");
+		HAL_GPIO_TogglePin(GPIOD, LED_GREEN_PIN);
+		HAL_Delay(1000);
+	}
+
 }
-static void task2_handler(void* parameters)
+
+
+static void led_orange_handler(void* parameters)
 {
-	char msg[100];
 	while(1)
 	{
-	  /*   printf("%s\n", (char*)parameters); */ /* For SWV */
-		snprintf(msg,100,"%s\n", (char*)parameters);
-		SEGGER_SYSVIEW_PrintfTarget(msg);
-		taskYIELD();
-  }
+		SEGGER_SYSVIEW_PrintfTarget("Toggling orange LED");
+		HAL_GPIO_TogglePin(GPIOD, LED_ORANGE_PIN);
+		HAL_Delay(800);
+	}
+
 }
+
+
+static void led_red_handler(void* parameters)
+{
+	while(1)
+	{
+		SEGGER_SYSVIEW_PrintfTarget("Toggling red LED");
+		HAL_GPIO_TogglePin(GPIOD, LED_RED_PIN);
+		HAL_Delay(400);
+	}
+
+}
+
 /* USER CODE END 4 */
 
 /**
