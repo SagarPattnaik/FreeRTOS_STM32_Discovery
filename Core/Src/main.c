@@ -60,7 +60,6 @@ extern  void SEGGER_UART_init(uint32_t);
 TaskHandle_t ledg_task_handle;
 TaskHandle_t ledr_task_handle;
 TaskHandle_t ledo_task_handle;
-TaskHandle_t btn_task_handle;
 
 TaskHandle_t volatile next_task_handle = NULL;
 /* USER CODE END PFP */
@@ -115,10 +114,6 @@ int main(void)
   configASSERT(status == pdPASS);
 
   status = xTaskCreate(led_orange_handler, "LED_orange_task", 200, NULL, 1, &ledo_task_handle);
-
-  configASSERT(status == pdPASS);
-
-  status = xTaskCreate(button_handler, "Button Task", 200, NULL, 4, &btn_task_handle);
 
   configASSERT(status == pdPASS);
 
@@ -238,7 +233,7 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
@@ -323,6 +318,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(MEMS_INT2_GPIO_Port, &GPIO_InitStruct);
 
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 6, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
 }
@@ -338,11 +337,11 @@ static void led_green_handler(void* parameters)
 		HAL_GPIO_TogglePin(GPIOD, LED_GREEN_PIN);
 		status = xTaskNotifyWait(0,0,NULL,pdMS_TO_TICKS(1000));
 		if(status == pdTRUE){
-			vTaskSuspendAll();
+			portENTER_CRITICAL();
 			next_task_handle = ledo_task_handle;
-			xTaskResumeAll();
 			HAL_GPIO_WritePin(GPIOD, LED_GREEN_PIN,GPIO_PIN_SET);
 			SEGGER_SYSVIEW_PrintfTarget("Delete green LED task");
+      portEXIT_CRITICAL();
 			vTaskDelete(NULL);
 		}
 
@@ -360,11 +359,11 @@ static void led_orange_handler(void* parameters)
 		HAL_GPIO_TogglePin(GPIOD, LED_ORANGE_PIN );
 		status = xTaskNotifyWait(0,0,NULL,pdMS_TO_TICKS(800));
 		if(status == pdTRUE){
-			vTaskSuspendAll();
+			portENTER_CRITICAL();
 			next_task_handle = ledr_task_handle;
-			xTaskResumeAll();
 			HAL_GPIO_WritePin(GPIOD, LED_ORANGE_PIN,GPIO_PIN_SET);
 			SEGGER_SYSVIEW_PrintfTarget("Delete orange LED task");
+      portEXIT_CRITICAL();
 			vTaskDelete(NULL);
 		}
 
@@ -382,38 +381,34 @@ static void led_red_handler(void* parameters)
 		HAL_GPIO_TogglePin(GPIOD, LED_RED_PIN);
 		status = xTaskNotifyWait(0,0,NULL,pdMS_TO_TICKS(400));
 		if(status == pdTRUE){
-			vTaskSuspendAll();
+      portENTER_CRITICAL();
 			next_task_handle = NULL;
-			xTaskResumeAll();
 			HAL_GPIO_WritePin(GPIOD, LED_RED_PIN,GPIO_PIN_SET);
 			SEGGER_SYSVIEW_PrintfTarget("Delete red LED task");
-			vTaskDelete(btn_task_handle);
+      portEXIT_CRITICAL();
 			vTaskDelete(NULL);
 		}
 
 	}
 }
 
-static void button_handler(void* parameters)
+void button_interrupt_handler(void)
 {
-	uint8_t btn_read = 0;
-	uint8_t prev_read = 0;
+	BaseType_t pxHigherPriorityTaskWoken;
 
-	while(1){
+	pxHigherPriorityTaskWoken = pdFALSE;
 
-		btn_read = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0);
 
-		if(btn_read)
-		{
-			if(! prev_read)
-				xTaskNotify(next_task_handle,0,eNoAction);
-		}
-		prev_read = btn_read;
-		vTaskDelay(pdMS_TO_TICKS(10));
+	traceISR_ENTER();
+	xTaskNotifyFromISR(next_task_handle,0,eNoAction,&pxHigherPriorityTaskWoken);
 
-	}
+	/* once the ISR exits, the below macro makes higher priority task which got unblocked to resume on the CPU */
+	portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
+
+	traceISR_EXIT();
 
 }
+
 void vApplicationIdleHook( void )
 {
 	HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI);
