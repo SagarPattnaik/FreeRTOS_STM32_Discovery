@@ -21,7 +21,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <stdio.h>
+
+
 #include "FreeRTOS.h"
 #include "task.h"
 /* USER CODE END Includes */
@@ -45,21 +46,22 @@
 
 /* USER CODE BEGIN PV */
 #define DWT_CTRL    (*(volatile uint32_t*)0xE0001000)
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 /* USER CODE BEGIN PFP */
+
 static void led_green_handler(void* parameters);
 static void led_orange_handler(void* parameters);
 static void led_red_handler(void* parameters);
-static void button_handler(void* parameters);
-extern  void SEGGER_UART_init(uint32_t);
 
+extern void SEGGER_UART_init(uint32_t);
 TaskHandle_t ledg_task_handle;
-TaskHandle_t ledr_task_handle;
 TaskHandle_t ledo_task_handle;
+TaskHandle_t ledr_task_handle;
 
 TaskHandle_t volatile next_task_handle = NULL;
 /* USER CODE END PFP */
@@ -108,12 +110,14 @@ int main(void)
   status = xTaskCreate(led_green_handler, "LED_green_task", 200, NULL, 3, &ledg_task_handle);
 
   configASSERT(status == pdPASS);
+
   next_task_handle = ledg_task_handle;
-  status = xTaskCreate(led_red_handler, "LED_red_task", 200,NULL, 2, &ledr_task_handle);
 
-  configASSERT(status == pdPASS);
+  status = xTaskCreate(led_orange_handler, "LED_orange_task", 200, NULL, 2, &ledo_task_handle);
 
-  status = xTaskCreate(led_orange_handler, "LED_orange_task", 200, NULL, 1, &ledo_task_handle);
+   configASSERT(status == pdPASS);
+
+  status = xTaskCreate(led_red_handler, "LED_red_task", 200,NULL, 1, &ledr_task_handle);
 
   configASSERT(status == pdPASS);
 
@@ -328,6 +332,25 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
+
+void button_interrupt_handler(void)
+{
+	BaseType_t pxHigherPriorityTaskWoken;
+
+	pxHigherPriorityTaskWoken = pdFALSE;
+
+
+	traceISR_ENTER();
+	xTaskNotifyFromISR(next_task_handle,0,eNoAction,&pxHigherPriorityTaskWoken);
+
+	/* once the ISR exits, the below macro makes higher priority task which got unblocked to resume on the CPU */
+	portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
+
+	traceISR_EXIT();
+
+}
+
+
 static void led_green_handler(void* parameters)
 {
 	BaseType_t  status;
@@ -341,9 +364,10 @@ static void led_green_handler(void* parameters)
 			next_task_handle = ledo_task_handle;
 			HAL_GPIO_WritePin(GPIOD, LED_GREEN_PIN,GPIO_PIN_SET);
 			SEGGER_SYSVIEW_PrintfTarget("Delete green LED task");
-      portEXIT_CRITICAL();
+			portEXIT_CRITICAL();
 			vTaskDelete(NULL);
 		}
+
 
 	}
 }
@@ -363,7 +387,7 @@ static void led_orange_handler(void* parameters)
 			next_task_handle = ledr_task_handle;
 			HAL_GPIO_WritePin(GPIOD, LED_ORANGE_PIN,GPIO_PIN_SET);
 			SEGGER_SYSVIEW_PrintfTarget("Delete orange LED task");
-      portEXIT_CRITICAL();
+			portEXIT_CRITICAL();
 			vTaskDelete(NULL);
 		}
 
@@ -381,39 +405,18 @@ static void led_red_handler(void* parameters)
 		HAL_GPIO_TogglePin(GPIOD, LED_RED_PIN);
 		status = xTaskNotifyWait(0,0,NULL,pdMS_TO_TICKS(400));
 		if(status == pdTRUE){
-      portENTER_CRITICAL();
+			portENTER_CRITICAL();
 			next_task_handle = NULL;
 			HAL_GPIO_WritePin(GPIOD, LED_RED_PIN,GPIO_PIN_SET);
 			SEGGER_SYSVIEW_PrintfTarget("Delete red LED task");
-      portEXIT_CRITICAL();
+			portEXIT_CRITICAL();
 			vTaskDelete(NULL);
 		}
 
 	}
-}
-
-void button_interrupt_handler(void)
-{
-	BaseType_t pxHigherPriorityTaskWoken;
-
-	pxHigherPriorityTaskWoken = pdFALSE;
-
-
-	traceISR_ENTER();
-	xTaskNotifyFromISR(next_task_handle,0,eNoAction,&pxHigherPriorityTaskWoken);
-
-	/* once the ISR exits, the below macro makes higher priority task which got unblocked to resume on the CPU */
-	portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
-
-	traceISR_EXIT();
 
 }
 
-void vApplicationIdleHook( void )
-{
-	HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI);
-
-}
 /* USER CODE END 4 */
 
 /**

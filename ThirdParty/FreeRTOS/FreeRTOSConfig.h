@@ -47,7 +47,7 @@
 #endif
 
 #define configUSE_PREEMPTION			1
-#define configUSE_IDLE_HOOK				1
+#define configUSE_IDLE_HOOK				0
 #define configUSE_TICK_HOOK				0
 #define configCPU_CLOCK_HZ				( SystemCoreClock )
 #define configTICK_RATE_HZ				( ( TickType_t ) 1000 )
@@ -86,7 +86,7 @@ to exclude the API function. */
 
 #define INCLUDE_xTaskGetIdleTaskHandle  1
 #define INCLUDE_pxTaskGetStackStart		1
-
+#define INCLUDE_xTaskGetHandle 1
 /* Cortex-M specific definitions. */
 #ifdef __NVIC_PRIO_BITS
 	/* __BVIC_PRIO_BITS will be specified when CMSIS is being used. */
